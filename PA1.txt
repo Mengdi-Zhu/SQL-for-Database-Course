@@ -1,0 +1,468 @@
+--1.
+INSERT INTO periods
+SELECT DISTINCT day,per
+FROM assigned
+ORDER BY day,per ASC;
+
+--2.
+INSERT INTO teachers
+SELECT tname, SUM(nper) AS tload
+FROM courses AS C,taught_by AS T
+WHERE C.cno=T.cno
+GROUP BY tname
+ORDER BY tname;
+
+--3.
+SELECT day,per,taught_by.cno
+FROM taught_by,assigned
+WHERE taught_by.cno=assigned.cno AND taught_by.tname='Marsalis'
+ORDER BY day,per ASC;
+
+--4.
+UPDATE assigned
+SET per=4
+WHERE cno=10 AND day= 'B';
+
+--5.
+SELECT day,per,assigned.cno
+FROM assigned,taught_to
+WHERE assigned.cno=taught_to.cno AND grade=11 AND hr>'A'
+ORDER BY day,per ASC;
+
+--6.
+UPDATE assigned
+SET per=2
+WHERE per=4 AND day='B' AND cno =
+(SELECT cno
+FROM taught_to NATURAL JOIN assigned
+WHERE grade = '11' AND day = 'B' AND per = '4' AND hr = 'Z');
+
+--7.
+SELECT tname,day,per,subj,grade,hr
+FROM taught_to,taught_by,assigned,courses
+WHERE taught_to.cno=taught_by.cno AND taught_to.cno=assigned.cno AND assigned.cno=courses.cno
+ORDER BY tname,day,per ASC;
+
+--8.
+SELECT grade, hr, day, per, subj
+FROM courses NATURAL JOIN assigned NATURAL JOIN
+(SELECT cno,T1.grade, T1.hr
+ 	FROM grades AS T1, taught_to AS T2
+WHERE T1.grade=T2.grade AND (T1.hr=T2.hr OR T2.hr='Z')
+) AS THIRDONE
+ORDER BY grade, hr, day, per;
+
+--9.
+SELECT tname,day,per
+FROM taught_by,assigned
+WHERE taught_by.cno=assigned.cno
+EXCEPT ALL
+SELECT DISTINCT tname,day,per
+FROM taught_by,assigned
+WHERE taught_by.cno=assigned.cno;
+
+--10.
+SELECT DISTINCT A.grade,A.hr,A.day,A.per
+FROM
+(SELECT grade, hr, day, per, subj
+FROM courses NATURAL JOIN assigned NATURAL JOIN
+(SELECT cno,T1.grade, T1.hr
+ FROM grades AS T1, taught_to AS T2
+WHERE T1.grade=T2.grade AND (T1.hr=T2.hr OR T2.hr='Z')
+) AS THIRDONE
+ORDER BY grade, hr, day, per)  AS A,
+(SELECT grade, hr, day, per, subj
+FROM courses NATURAL JOIN assigned NATURAL JOIN
+(SELECT cno,T1.grade, T1.hr
+ 	FROM grades AS T1, taught_to AS T2
+WHERE T1.grade=T2.grade AND (T1.hr=T2.hr OR T2.hr='Z')
+) AS THIRDONE
+ORDER BY grade, hr, day, per) AS B
+WHERE A.grade=B.grade AND A.hr=B.hr AND A.day=B.day AND A.per=B.per AND A.subj<>B.subj;
+
+--11.
+SELECT A.c1,A.d1,A.p1
+FROM
+(SELECT courses.cno AS c1, day AS d1, per AS p1
+FROM courses,assigned
+WHERE courses.cno=assigned.cno
+ORDER BY courses.cno,day,per) AS A,
+(SELECT courses.cno AS c2, day AS d2, per AS p2
+FROM courses,assigned
+WHERE courses.cno=assigned.cno
+ORDER BY courses.cno,day,per) AS B
+WHERE A.c1=B.c2 AND A.d1=B.d2 AND A.p1<>B.p2;
+
+--12.
+SELECT courses.cno,(nper- SumNumber) AS FinalData
+FROM courses,
+(SELECT assigned.cno,count(*) AS SumNumber
+FROM assigned
+GROUP BY assigned.cno) AS T
+WHERE SumNumber <nper AND T.cno=courses.cno
+ORDER BY courses.cno;
+
+--13.
+SELECT DISTINCT tname,subj
+FROM courses NATURAL JOIN taught_by
+WHERE tname NOT IN
+(SELECT DISTINCT A.tname
+FROM
+(SELECT tname,subj
+FROM courses NATURAL JOIN taught_by
+ORDER BY tname,subj) AS A,
+(SELECT tname,subj
+FROM courses NATURAL JOIN taught_by
+ORDER BY tname,subj) AS B
+WHERE A.tname=B.tname AND A.subj<>B.subj
+ORDER BY A.tname);
+
+--14.
+SELECT DISTINCT tname,day,per
+INTO Temp1
+FROM assigned ,taught_by
+WHERE assigned.cno=taught_by.cno
+ORDER BY tname,day,per;
+
+SELECT tname,day,COUNT(per)
+INTO Temp2
+FROM Temp1
+GROUP BY tname,day
+HAVING COUNT(per)<>1 AND COUNT(per)<>4
+ORDER BY tname;
+
+SELECT Temp1.tname, Temp1.day, Temp1.per, Temp2.count
+INTO Temp3
+FROM Temp1,Temp2
+WHERE Temp1.tname= Temp2.tname AND Temp1.day= Temp2.day
+ORDER BY Temp1.tname, Temp1.day, Temp1.per;
+
+SELECT tname,day,per,count
+INTO Temp4
+FROM Temp3
+WHERE count=2
+ORDER BY tname,day,per DESC;
+
+SELECT tname,day,per,count
+INTO Temp5
+FROM Temp3
+WHERE count=3
+ORDER BY tname,day,per;
+
+SELECT tname,day,SUM(per)
+INTO Temp6
+FROM Temp5
+WHERE count=3
+GROUP BY tname,day
+ORDER BY tname,day;
+
+SELECT tname,day,sum
+INTO Temp7
+FROM Temp6
+WHERE sum=7 OR sum=8
+ORDER BY tname,day;
+
+UPDATE Temp7
+SET sum=1
+WHERE TRUE;
+
+SELECT tname,day,sum AS windows
+INTO Temp7_2
+FROM Temp7;
+
+SELECT tname,day,per,count
+INTO Temp4_2
+FROM Temp3
+WHERE count=2
+ORDER BY tname,day,per DESC;
+
+SELECT Temp4.tname, Temp4.day, (Temp4.per- Temp4_2.per) AS difference
+INTO Temp4_3
+FROM Temp4,Temp4_2
+WHERE Temp4.tname= Temp4_2.tname AND Temp4.day= Temp4_2.day AND Temp4.per<> Temp4_2.per AND (Temp4.per- Temp4_2.per)>0
+ORDER BY Temp4.tname, Temp4.day;
+
+SELECT tname,day,(difference-1) AS windows
+INTO Temp4_4
+FROM Temp4_3
+WHERE difference=2 OR difference=3;
+
+INSERT INTO Temp4_4(SELECT * FROM Temp7_2);
+
+SELECT *
+INTO Temp4_5
+FROM Temp4_4
+ORDER BY tname,day;
+
+--15.
+SELECT DISTINCT tname,day,per
+INTO Temp1
+FROM assigned ,taught_by
+WHERE assigned.cno=taught_by.cno
+ORDER BY tname,day,per;
+
+SELECT tname,day,COUNT(per)
+INTO Temp2
+FROM Temp1
+GROUP BY tname,day
+HAVING COUNT(per)<>1 AND COUNT(per)<>4
+ORDER BY tname;
+
+SELECT Temp1.tname, Temp1.day, Temp1.per, Temp2.count
+INTO Temp3
+FROM Temp1,Temp2
+WHERE Temp1.tname= Temp2.tname AND Temp1.day= Temp2.day
+ORDER BY Temp1.tname, Temp1.day, Temp1.per;
+
+SELECT tname,day,per,count
+INTO Temp4
+FROM Temp3
+WHERE count=2
+ORDER BY tname,day,per DESC;
+
+SELECT tname,day,per,count
+INTO Temp5
+FROM Temp3
+WHERE count=3
+ORDER BY tname,day,per;
+
+SELECT tname,day,SUM(per)
+INTO Temp6
+FROM Temp5
+WHERE count=3
+GROUP BY tname,day
+ORDER BY tname,day;
+
+SELECT tname,day,sum
+INTO Temp7
+FROM Temp6
+WHERE sum=7 OR sum=8
+ORDER BY tname,day;
+
+UPDATE Temp7
+SET sum=1
+WHERE TRUE;
+
+SELECT tname,day,sum AS windows
+INTO Temp7_2
+FROM Temp7;
+
+SELECT tname,day,per,count
+INTO Temp4_2
+FROM Temp3
+WHERE count=2
+ORDER BY tname,day,per DESC;
+
+SELECT Temp4.tname, Temp4.day, (Temp4.per- Temp4_2.per) AS difference
+INTO Temp4_3
+FROM Temp4,Temp4_2
+WHERE Temp4.tname= Temp4_2.tname AND Temp4.day= Temp4_2.day AND Temp4.per<> Temp4_2.per AND (Temp4.per- Temp4_2.per)>0
+ORDER BY Temp4.tname, Temp4.day;
+
+SELECT tname,day,(difference-1) AS windows
+INTO Temp4_4
+FROM Temp4_3
+WHERE difference=2 OR difference=3;
+
+INSERT INTO Temp4_4(SELECT * FROM Temp7_2);
+
+SELECT *
+INTO Temp4_5
+FROM Temp4_4
+ORDER BY tname,day;
+
+SELECT tname,day,COUNT(per)
+INTO Temp15_1
+FROM Temp1
+GROUP BY tname,day
+HAVING COUNT(per)<>2 AND COUNT(per)<>3
+ORDER BY tname;
+
+SELECT DISTINCT tname,count AS windows
+INTO Temp15_2
+FROM Temp15_1
+ORDER BY tname;
+
+UPDATE Temp15_2
+SET windows=0
+WHERE TRUE;
+
+SELECT tname,windows
+INTO Temp15_3
+FROM Temp4_4;
+
+INSERT INTO Temp15_3 (SELECT * FROM Temp15_2);
+
+SELECT tname,SUM(windows) AS TotalWindows
+INTO Temp15_4
+FROM Temp15_3
+GROUP BY tname
+ORDER BY tname;
+
+--16.
+SELECT DISTINCT tname,day,per
+INTO Temp1
+FROM assigned ,taught_by
+WHERE assigned.cno=taught_by.cno
+ORDER BY tname,day,per;
+
+SELECT tname,day,COUNT(per)
+INTO Temp2
+FROM Temp1
+GROUP BY tname,day
+HAVING COUNT(per)<>1 AND COUNT(per)<>4
+ORDER BY tname;
+
+SELECT Temp1.tname, Temp1.day, Temp1.per, Temp2.count
+INTO Temp3
+FROM Temp1,Temp2
+WHERE Temp1.tname= Temp2.tname AND Temp1.day= Temp2.day
+ORDER BY Temp1.tname, Temp1.day, Temp1.per;
+
+SELECT tname,day,per,count
+INTO Temp4
+FROM Temp3
+WHERE count=2
+ORDER BY tname,day,per DESC;
+
+SELECT tname,day,per,count
+INTO Temp5
+FROM Temp3
+WHERE count=3
+ORDER BY tname,day,per;
+
+SELECT tname,day,SUM(per)
+INTO Temp6
+FROM Temp5
+WHERE count=3
+GROUP BY tname,day
+ORDER BY tname,day;
+
+SELECT tname,day,sum
+INTO Temp7
+FROM Temp6
+WHERE sum=7 OR sum=8
+ORDER BY tname,day;
+
+UPDATE Temp7
+SET sum=1
+WHERE TRUE;
+
+SELECT tname,day,sum AS windows
+INTO Temp7_2
+FROM Temp7;
+
+SELECT tname,day,per,count
+INTO Temp4_2
+FROM Temp3
+WHERE count=2
+ORDER BY tname,day,per DESC;
+
+SELECT Temp4.tname, Temp4.day, (Temp4.per- Temp4_2.per) AS difference
+INTO Temp4_3
+FROM Temp4,Temp4_2
+WHERE Temp4.tname= Temp4_2.tname AND Temp4.day= Temp4_2.day AND Temp4.per<> Temp4_2.per AND (Temp4.per- Temp4_2.per)>0
+ORDER BY Temp4.tname, Temp4.day;
+
+SELECT tname,day,(difference-1) AS windows
+INTO Temp4_4
+FROM Temp4_3
+WHERE difference=2 OR difference=3;
+
+INSERT INTO Temp4_4(SELECT * FROM Temp7_2);
+
+SELECT *
+INTO Temp4_5
+FROM Temp4_4
+ORDER BY tname,day;
+
+SELECT tname,day,COUNT(per)
+INTO Temp15_1
+FROM Temp1
+GROUP BY tname,day
+HAVING COUNT(per)<>2 AND COUNT(per)<>3
+ORDER BY tname;
+
+SELECT DISTINCT tname,count AS windows
+INTO Temp15_2
+FROM Temp15_1
+ORDER BY tname;
+
+UPDATE Temp15_2
+SET windows=0
+WHERE TRUE;
+
+SELECT tname,windows
+INTO Temp15_3
+FROM Temp4_4;
+
+INSERT INTO Temp15_3 (SELECT * FROM Temp15_2);
+
+SELECT tname,SUM(windows) AS TotalWindows
+INTO Temp15_4
+FROM Temp15_3
+GROUP BY tname
+ORDER BY tname;
+
+SELECT *
+INTO Temp15_5
+FROM Temp15_4;
+
+UPDATE Temp15_5
+SET tname='goodness' 
+WHERE TRUE;
+
+SELECT tname AS name, SUM(totalwindows) AS sumnumber
+INTO Temp16
+FROM Temp15_5
+GROUP BY tname;
+
+--17.
+SELECT cno, tname, day, per
+INTO Temp17_1
+FROM assigned NATURAL JOIN taught_by;
+
+SELECT cno, tname, day, per
+INTO Temp17_2
+FROM assigned NATURAL JOIN taught_by;
+
+SELECT DISTINCT Temp17_1.cno, Temp17_2. day, Temp17_2. per
+FROM Temp17_1,Temp17_2
+WHERE Temp17_1.tname = Temp17_2.tname AND Temp17_1. cno <> Temp17_2. cno
+ORDER BY Temp17_1. cno, Temp17_2. day, Temp17_2. per;
+
+--18.
+SELECT assigned.cno,grade, hr, assigned.day, assigned.per
+INTO Temp18_1
+FROM assigned NATURAL JOIN 
+(SELECT cno,T1.grade, T1.hr
+ 	FROM grades AS T1, taught_to AS T2
+WHERE T1.grade=T2.grade
+AND (T1.hr=T2.hr OR T2.hr='Z')
+) AS TT
+ORDER BY assigned.cno,grade, hr, assigned.day, assigned.per;
+
+SELECT DISTINCT A.cno,B.day,B.per
+FROM Temp18_1 AS A, Temp18_1 AS B
+WHERE A.grade = B.grade AND A.hr=B.hr AND A. cno <> B. cno 
+ORDER BY A.cno,B.day,B.per;
+
+--19.
+SELECT tname,day, COUNT(day) AS D
+INTO Temp19
+FROM taught_by NATURAL JOIN assigned
+GROUP BY tname,day
+ORDER BY tname,day;
+
+SELECT tname,MAX(d) AS MD
+INTO Temp19_2
+FROM Temp19
+GROUP BY tname
+ORDER BY tname;
+
+SELECT Temp19.tname,Temp19.day,Temp19_2.MD
+INTO Temp19_3
+FROM Temp19 NATURAL JOIN Temp19_2
+WHERE Temp19.tname=Temp19_2.tname AND Temp19.d=Temp19_2.MD
+ORDER BY Temp19.tname, Temp19.day;
+
